@@ -1,0 +1,30 @@
+# DNS Server Configuration
+# Example configuration for meshdns authoritative DNS server
+
+# DNS server settings
+listen_addr: ":53"
+zone: "mesh.example.com"
+
+# LibP2P settings for registry sync
+identity_key: "CAESQNExample..."
+
+listen_addrs:
+  - "/ip4/0.0.0.0/tcp/4001"
+
+bootstrap_peers:
+  - "/dns4/bootstrap.mesh.example.com/tcp/4001/p2p/12D3KooW..."
+
+# Rate limiting for DNS queries
+rate_limit_qps: 10000
+
+# ECS (EDNS Client Subnet) settings
+ecs_enabled: true
+ecs_scope_prefix: 24
+
+# Selection scoring weights
+geo_weight: 0.4
+latency_weight: 0.3
+health_weight: 0.3
+
+# Logging
+log_level: "info"

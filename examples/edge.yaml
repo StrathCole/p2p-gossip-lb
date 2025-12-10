@@ -1,0 +1,38 @@
+# Edge Proxy Configuration
+# Example configuration for meshproxy edge node
+
+# LibP2P settings
+identity_key: "CAESQNExample..." # Ed25519 private key in base64
+
+listen_addrs:
+  - "/ip4/0.0.0.0/tcp/4001"
+
+bootstrap_peers:
+  - "/dns4/bootstrap.mesh.example.com/tcp/4001/p2p/12D3KooW..."
+
+# Edge proxy settings
+listen_addr: ":443"
+tls_cert: "/etc/mesh/tls/cert.pem"
+tls_key: "/etc/mesh/tls/key.pem"
+
+# Optional: ACME for automatic TLS
+acme_domains:
+  - "edge1.example.com"
+acme_email: "admin@example.com"
+
+# Rate limiting
+rate_limit_rps: 1000
+rate_limit_burst: 2000
+
+# Cache settings
+cache_size_mb: 512
+cache_ttl: 300
+
+# Node advertisement
+country: "US"
+region: "us-east"
+advertise_ips:
+  - "203.0.113.10"
+
+# Logging
+log_level: "info"
