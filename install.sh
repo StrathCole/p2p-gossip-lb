@@ -136,13 +136,21 @@ prompt_multi_choice() {
     local selected=()
     local input
 
-    echo -e "${CYAN}$message${NC} (comma-separated, e.g., 1,2,3)"
+    echo -e "${CYAN}$message${NC}"
     for i in "${!options[@]}"; do
         echo "  $((i+1))) ${options[$i]}"
     done
+    echo ""
+    echo -e "${CYAN}Enter the numbers of your choices, separated by commas (e.g., 1,2,3 or just 1)${NC}"
 
     while true; do
-        read -p "$(echo -e "${CYAN}Enter choices${NC}: ")" input
+        read -p "$(echo -e "${CYAN}Your selection${NC}: ")" input
+        
+        # Handle empty input
+        if [ -z "$input" ]; then
+            echo "Please enter at least one choice." >&2
+            continue
+        fi
         
         IFS=',' read -ra choices <<< "$input"
         selected=()
@@ -150,10 +158,15 @@ prompt_multi_choice() {
 
         for choice in "${choices[@]}"; do
             choice=$(echo "$choice" | tr -d ' ')
+            # Skip empty entries (e.g., from trailing comma)
+            if [ -z "$choice" ]; then
+                continue
+            fi
             if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
                 selected+=("$((choice-1))")
             else
                 valid=false
+                echo "Invalid choice: '$choice'. Please enter numbers between 1 and ${#options[@]}." >&2
                 break
             fi
         done
@@ -162,7 +175,9 @@ prompt_multi_choice() {
             echo "${selected[*]}"
             return
         fi
-        echo "Invalid input. Please try again." >&2
+        if $valid; then
+            echo "Please enter at least one choice." >&2
+        fi
     done
 }
 
