@@ -135,13 +135,20 @@ prompt_multi_choice() {
     local options=("$@")
     local selected=()
     local input
-
-    echo -e "${CYAN}$message${NC}"
-    for i in "${!options[@]}"; do
-        echo "  $((i+1))) ${options[$i]}"
+    
+    # Extract short names from options (e.g., "meshagent (Backend agent...)" -> "meshagent")
+    local short_names=()
+    for opt in "${options[@]}"; do
+        local short_name=$(echo "$opt" | awk '{print $1}')
+        short_names+=("$short_name")
     done
-    echo ""
-    echo -e "${CYAN}Enter the numbers of your choices, separated by commas (e.g., 1,2,3 or just 1)${NC}"
+
+    echo -e "${CYAN}$message${NC}" >&2
+    for i in "${!options[@]}"; do
+        echo "  $((i+1))) ${options[$i]}" >&2
+    done
+    echo "" >&2
+    echo -e "${CYAN}Enter names or numbers, separated by commas (e.g., meshagent,meshproxy or 1,2,3)${NC}" >&2
 
     while true; do
         read -p "$(echo -e "${CYAN}Your selection${NC}: ")" input
@@ -151,6 +158,9 @@ prompt_multi_choice() {
             echo "Please enter at least one choice." >&2
             continue
         fi
+        
+        # Replace spaces with commas for space-separated input
+        input=$(echo "$input" | tr ' ' ',')
         
         IFS=',' read -ra choices <<< "$input"
         selected=()
@@ -162,12 +172,31 @@ prompt_multi_choice() {
             if [ -z "$choice" ]; then
                 continue
             fi
-            if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
-                selected+=("$((choice-1))")
+            
+            # Check if it's a number
+            if [[ "$choice" =~ ^[0-9]+$ ]]; then
+                if [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
+                    selected+=("$((choice-1))")
+                else
+                    valid=false
+                    echo "Invalid number: '$choice'. Please enter numbers between 1 and ${#options[@]}." >&2
+                    break
+                fi
             else
-                valid=false
-                echo "Invalid choice: '$choice'. Please enter numbers between 1 and ${#options[@]}." >&2
-                break
+                # Check if it's a name
+                local found=false
+                for i in "${!short_names[@]}"; do
+                    if [ "${short_names[$i]}" = "$choice" ]; then
+                        selected+=("$i")
+                        found=true
+                        break
+                    fi
+                done
+                if ! $found; then
+                    valid=false
+                    echo "Invalid choice: '$choice'. Valid names: ${short_names[*]}" >&2
+                    break
+                fi
             fi
         done
 
