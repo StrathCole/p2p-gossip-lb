@@ -366,6 +366,13 @@ dns:
   # EDNS Client Subnet (geo-aware responses)
   ecs: true
   
+  # Geo-based DNS (returns geographically closest edges)
+  geo_enabled: true
+  geo_city_db: "/var/lib/mesh/GeoLite2-City.mmdb"
+  geo_asn_db: "/var/lib/mesh/GeoLite2-ASN.mmdb"  # Optional
+  geo_weight: 0.5                  # 0.0-1.0, higher = stronger geo preference
+  geo_reload_sec: 86400            # Reload databases every 24 hours
+  
   # Rate limiting
   rrl_qps: 10000
   rrl_burst: 20000
@@ -377,7 +384,37 @@ selector:
   softmax_T: 0.7
 ```
 
-### 2. Create Data Directory
+### 2. Set Up GeoIP Databases (Optional but Recommended)
+
+For geo-based DNS to work, you need MaxMind GeoLite2 databases:
+
+```bash
+# Create a free MaxMind account at:
+# https://www.maxmind.com/en/geolite2/signup
+
+# Install geoipupdate
+sudo apt-get install geoipupdate  # Debian/Ubuntu
+# or
+sudo yum install geoipupdate      # RHEL/CentOS
+
+# Configure /etc/GeoIP.conf with your account ID and license key
+# AccountID YOUR_ACCOUNT_ID
+# LicenseKey YOUR_LICENSE_KEY
+# EditionIDs GeoLite2-City GeoLite2-ASN
+
+# Download databases
+sudo geoipupdate
+
+# Copy to mesh directory
+sudo mkdir -p /var/lib/mesh
+sudo cp /var/lib/GeoIP/GeoLite2-City.mmdb /var/lib/mesh/
+sudo cp /var/lib/GeoIP/GeoLite2-ASN.mmdb /var/lib/mesh/
+sudo chown mesh:mesh /var/lib/mesh/*.mmdb
+```
+
+> **Tip**: Set up a cron job to run `geoipupdate` weekly and the DNS server will automatically reload the databases.
+
+### 3. Create Data Directory
 
 ```bash
 sudo mkdir -p /var/lib/mesh/dns

@@ -31,6 +31,21 @@ dns:
   rrl_burst: 20000
   rrl_window: 5m
 
+  # Geo-based DNS settings
+  # Enable to return geographically closest edges to clients
+  geo_enabled: true
+  # Path to MaxMind GeoIP2 or GeoLite2 City database
+  # Download from: https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
+  geo_city_db: "/var/lib/mesh/GeoLite2-City.mmdb"
+  # Optional: Path to MaxMind GeoIP2 or GeoLite2 ASN database
+  geo_asn_db: "/var/lib/mesh/GeoLite2-ASN.mmdb"
+  # Weight for geo scoring (0.0-1.0, default: 0.5)
+  # Higher values give more preference to geographic proximity
+  geo_weight: 0.5
+  # Reload geo databases every N seconds (0 = no automatic reload)
+  # Useful when updating databases via geoipupdate
+  geo_reload_sec: 86400  # 24 hours
+
 # Selector tuning
 selector:
   delta_height: 2

@@ -170,6 +170,13 @@ type DNSConfig struct {
 	RRLQPS     float64       `mapstructure:"rrl_qps"`
 	RRLBurst   int           `mapstructure:"rrl_burst"`
 	RRLWindow  time.Duration `mapstructure:"rrl_window"`
+
+	// Geo-based DNS settings
+	GeoEnabled   bool    `mapstructure:"geo_enabled"`    // Enable geo-based DNS responses
+	GeoCityDB    string  `mapstructure:"geo_city_db"`    // Path to MaxMind GeoIP2/GeoLite2-City database
+	GeoASNDB     string  `mapstructure:"geo_asn_db"`     // Path to MaxMind GeoIP2/GeoLite2-ASN database (optional)
+	GeoWeight    float64 `mapstructure:"geo_weight"`     // Weight for geo scoring (0.0-1.0, default: 0.5)
+	GeoReloadSec int     `mapstructure:"geo_reload_sec"` // Reload geo databases every N seconds (0 = no reload)
 }
 
 // Load reads configuration from disk using Viper with sensible defaults.

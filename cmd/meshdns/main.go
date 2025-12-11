@@ -18,6 +18,7 @@ import (
 
 	"github.com/lunc/mesh/pkg/config"
 	"github.com/lunc/mesh/pkg/dnsplugin"
+	"github.com/lunc/mesh/pkg/geo"
 	"github.com/lunc/mesh/pkg/gossip"
 	"github.com/lunc/mesh/pkg/logging"
 	"github.com/lunc/mesh/pkg/registry"
@@ -92,13 +93,63 @@ func main() {
 		}
 	}()
 
+	// Initialize geo provider if enabled
+	var geoProvider geo.GeoProvider
+	if cfg.DNS.GeoEnabled && cfg.DNS.GeoCityDB != "" {
+		logger.Info("initializing geo provider",
+			zap.String("city_db", cfg.DNS.GeoCityDB),
+			zap.String("asn_db", cfg.DNS.GeoASNDB),
+		)
+		maxmindProvider, err := geo.NewMaxMindProvider(geo.MaxMindConfig{
+			CityDBPath: cfg.DNS.GeoCityDB,
+			ASNDBPath:  cfg.DNS.GeoASNDB,
+		})
+		if err != nil {
+			logger.Fatal("failed to initialize geo provider", zap.Error(err))
+		}
+		geoProvider = maxmindProvider
+		defer maxmindProvider.Close()
+
+		// Set up periodic reload if configured
+		if cfg.DNS.GeoReloadSec > 0 {
+			go func() {
+				ticker := time.NewTicker(time.Duration(cfg.DNS.GeoReloadSec) * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-rootCtx.Done():
+						return
+					case <-ticker.C:
+						logger.Info("reloading geo databases")
+						if err := maxmindProvider.Reload(geo.MaxMindConfig{
+							CityDBPath: cfg.DNS.GeoCityDB,
+							ASNDBPath:  cfg.DNS.GeoASNDB,
+						}); err != nil {
+							logger.Warn("failed to reload geo databases", zap.Error(err))
+						}
+					}
+				}
+			}()
+		}
+	} else if cfg.DNS.GeoEnabled {
+		logger.Warn("geo DNS enabled but no city database configured, using stub provider")
+		geoProvider = geo.NewStubProvider()
+	}
+
+	geoWeight := cfg.DNS.GeoWeight
+	if geoWeight <= 0 {
+		geoWeight = 0.5
+	}
+
 	zoneView, err := dnsplugin.NewRegistryZoneView(dnsplugin.RegistryZoneViewConfig{
-		Store:      store,
-		Zone:       zone,
-		NSLabels:   cfg.DNS.NSLabels,
-		TTLNSA:     uint32(cfg.DNS.TTLNSA),
-		TTLService: uint32(cfg.DNS.TTLService),
-		Logger:     logger.Named("zone"),
+		Store:       store,
+		Zone:        zone,
+		NSLabels:    cfg.DNS.NSLabels,
+		TTLNSA:      uint32(cfg.DNS.TTLNSA),
+		TTLService:  uint32(cfg.DNS.TTLService),
+		Logger:      logger.Named("zone"),
+		GeoProvider: geoProvider,
+		GeoWeight:   geoWeight,
 	})
 	if err != nil {
 		logger.Fatal("zone view", zap.Error(err))
@@ -158,6 +209,8 @@ func main() {
 		zap.String("zone", zone),
 		zap.Int("chains", len(chains)),
 		zap.Bool("ecs", cfg.DNS.EnableECS),
+		zap.Bool("geo_enabled", cfg.DNS.GeoEnabled),
+		zap.Float64("geo_weight", geoWeight),
 		zap.Float64("rrl_qps", cfg.DNS.RRLQPS),
 	)
 
