@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/spf13/cobra"
 )
 
@@ -54,10 +57,33 @@ var genkeysCmd = &cobra.Command{
 	Use:   "genkeys",
 	Short: "Generate libp2p identity keypair",
 	Run: func(cmd *cobra.Command, args []string) {
-		// Stub - would generate Ed25519 keypair and print base64
+		// Generate Ed25519 keypair
+		privKey, pubKey, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating keypair: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Derive peer ID from public key
+		peerID, err := peer.IDFromPublicKey(pubKey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error deriving peer ID: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Marshal private key to bytes
+		privKeyBytes, err := crypto.MarshalPrivateKey(privKey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error marshaling private key: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Encode private key as base64
+		privKeyB64 := base64.StdEncoding.EncodeToString(privKeyBytes)
+
 		fmt.Println("Generated identity keypair:")
-		fmt.Println("Public Key:  12D3KooWExample...")
-		fmt.Println("Private Key: CAESQExample...")
+		fmt.Printf("Public Key:  %s\n", peerID.String())
+		fmt.Printf("Private Key: %s\n", privKeyB64)
 		fmt.Println("Save the private key in your config file")
 	},
 }

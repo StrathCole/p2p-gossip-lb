@@ -140,7 +140,7 @@ func parseIdentityKey(b64 string) (crypto.PrivKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode identity key: %w", err)
 	}
-	key, err := crypto.UnmarshalEd25519PrivateKey(raw)
+	key, err := crypto.UnmarshalPrivateKey(raw)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal identity key: %w", err)
 	}
@@ -156,6 +156,11 @@ func buildProxyConfig(cfg config.Config, logger *zap.Logger, store *registry.Sto
 	ttl, infinite, err := parseCacheTTL(cfg.Cache.TTLHeighted)
 	if err != nil {
 		return proxy.Config{}, err
+	}
+
+	backendScheme := cfg.Edge.BackendScheme
+	if backendScheme == "" {
+		backendScheme = "https"
 	}
 
 	return proxy.Config{
@@ -175,7 +180,7 @@ func buildProxyConfig(cfg config.Config, logger *zap.Logger, store *registry.Sto
 		},
 		EdgeCountry:   cfg.Edge.Country,
 		EdgeRegion:    cfg.Edge.Region,
-		BackendScheme: "https",
+		BackendScheme: backendScheme,
 		Logger:        logger,
 	}, nil
 }

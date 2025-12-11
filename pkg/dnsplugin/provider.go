@@ -76,18 +76,28 @@ func (v *RegistryZoneView) EdgeRecords(ctx context.Context, chain registry.Chain
 		return nil, err
 	}
 	entries, _ := v.store.NodeSnapshot()
+	v.log.Info("EdgeRecords called",
+		zap.String("chain", string(chain)),
+		zap.Int("node_entries", len(entries)),
+	)
 	type edge struct {
 		rr   dns.RR
 		hash uint32
 	}
 	edges := make([]edge, 0, len(entries))
 	seen := make(map[string]struct{})
-	for _, entry := range entries {
+	for id, entry := range entries {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
 		}
+		v.log.Debug("checking node entry",
+			zap.String("id", string(id)),
+			zap.Bool("tombstone", entry.Tombstone),
+			zap.Bool("ns_serving", entry.Value.NSServing),
+			zap.Int("ips", len(entry.Value.IPs)),
+		)
 		if entry.Tombstone {
 			continue
 		}
@@ -185,6 +195,7 @@ func toRR(ip net.IP, zone string, ttl uint32) dns.RR {
 	}
 	header := dns.RR_Header{Name: zone, Class: dns.ClassINET, Ttl: ttl}
 	if v4 := ip.To4(); v4 != nil {
+		header.Rrtype = dns.TypeA
 		return &dns.A{Hdr: header, A: v4}
 	}
 	if v6 := ip.To16(); v6 != nil {

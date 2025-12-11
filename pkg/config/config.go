@@ -93,15 +93,16 @@ type MeshConfig struct {
 
 // EdgeConfig configures the mesh proxy edge node.
 type EdgeConfig struct {
-	ID           string   `mapstructure:"id"`
-	ListenHTTP   string   `mapstructure:"listen_http"`
-	ListenHTTPS  string   `mapstructure:"listen_https"`
-	EnableH3     bool     `mapstructure:"h3"`
-	Chains       []string `mapstructure:"chains"`
-	Country      string   `mapstructure:"country"`
-	Region       string   `mapstructure:"region"`
-	AdvertiseIPs []string `mapstructure:"advertise_ips"`
-	NSServing    bool     `mapstructure:"ns_serving"`
+	ID            string   `mapstructure:"id"`
+	ListenHTTP    string   `mapstructure:"listen_http"`
+	ListenHTTPS   string   `mapstructure:"listen_https"`
+	EnableH3      bool     `mapstructure:"h3"`
+	Chains        []string `mapstructure:"chains"`
+	Country       string   `mapstructure:"country"`
+	Region        string   `mapstructure:"region"`
+	AdvertiseIPs  []string `mapstructure:"advertise_ips"`
+	NSServing     bool     `mapstructure:"ns_serving"`
+	BackendScheme string   `mapstructure:"backend_scheme"` // "http" or "https" (default: "https")
 }
 
 // BackendConfig configures the meshagent running alongside a backend node.

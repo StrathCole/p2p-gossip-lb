@@ -127,6 +127,9 @@ func New(cfg Config, logger *zap.Logger) (*Agent, error) {
 }
 
 func (a *Agent) Run(ctx context.Context) error {
+	// Wait briefly for gossipsub mesh to form before publishing
+	time.Sleep(2 * time.Second)
+
 	if err := a.publishMeta(ctx); err != nil {
 		a.log.Warn("failed to publish backend meta", zap.Error(err))
 	}
@@ -141,6 +144,11 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	g.Go(func() error {
 		return a.runMetricsLoop(gCtx)
+	})
+
+	// Republish meta periodically to ensure propagation
+	g.Go(func() error {
+		return a.runMetaRepublishLoop(gCtx)
 	})
 
 	err := g.Wait()
@@ -206,11 +214,35 @@ func (a *Agent) runMetricsLoop(ctx context.Context) error {
 	}
 }
 
+func (a *Agent) runMetaRepublishLoop(ctx context.Context) error {
+	// Republish meta every 30 seconds to ensure propagation through mesh
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if err := a.publishMeta(ctx); err != nil {
+				a.log.Warn("failed to republish backend meta", zap.Error(err))
+			}
+		}
+	}
+}
+
 func (a *Agent) collectAndPublish(ctx context.Context) {
 	result, err := a.collector.Collect(ctx)
 	if err != nil {
 		a.log.Warn("metrics collection error", zap.Error(err))
 	}
+
+	a.log.Info("collected metrics",
+		zap.Int64("height", result.Height),
+		zap.String("health", result.Health),
+		zap.Bool("catching_up", result.CatchingUp),
+		zap.Float32("rtt_ms", result.RTTms),
+	)
 
 	metrics := registry.BackendMetrics{
 		ID:         a.meta.ID,

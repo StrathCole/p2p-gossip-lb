@@ -46,13 +46,13 @@ type BackendMetrics struct {
 
 // NodeAdvert is published by edges to announce availability for DNS service and geo placement.
 type NodeAdvert struct {
-	ID        NodeID
-	NSServing bool
-	IPs       []net.IP
-	Country   string
-	Region    string
-	AtUnix    int64
-	PubKey    []byte
-	Sig       []byte
-	Clock     uint64
+	ID        NodeID   `cbor:"id"`
+	NSServing bool     `cbor:"ns_serving"`
+	IPs       []net.IP `cbor:"ips"`
+	Country   string   `cbor:"country"`
+	Region    string   `cbor:"region"`
+	AtUnix    int64    `cbor:"at_unix"`
+	PubKey    []byte   `cbor:"pub_key"`
+	Sig       []byte   `cbor:"sig"`
+	Clock     uint64   `cbor:"clock"`
 }

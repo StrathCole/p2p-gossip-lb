@@ -179,6 +179,25 @@ func NewService(ctx context.Context, cfg Config, store *registry.Store, log *zap
 	svc.startAntiEntropy(childCtx)
 	svc.startMaintenance(childCtx)
 
+	// Add network notifier to log peer connections
+	svc.host.Network().Notify(&network.NotifyBundle{
+		ConnectedF: func(n network.Network, c network.Conn) {
+			svc.log.Info("peer connected",
+				zap.String("peer", c.RemotePeer().String()),
+				zap.String("direction", c.Stat().Direction.String()),
+			)
+		},
+		DisconnectedF: func(n network.Network, c network.Conn) {
+			svc.log.Info("peer disconnected", zap.String("peer", c.RemotePeer().String()))
+		},
+	})
+
+	log.Info("gossip service started",
+		zap.String("peer_id", h.ID().String()),
+		zap.Strings("listen_addrs", cfg.ListenAddrs),
+		zap.Int("bootstrap_count", len(cfg.Bootstrap)),
+	)
+
 	if err := svc.connectBootstraps(ctx, cfg.Bootstrap); err != nil {
 		log.Warn("bootstrapping failed", zap.Error(err))
 	}
@@ -197,19 +216,25 @@ func (s *Service) consume(ctx context.Context, topic string, sub *pubsub.Subscri
 			continue
 		}
 
+		s.log.Debug("received gossip message",
+			zap.String("topic", topic),
+			zap.String("from", msg.ReceivedFrom.String()),
+			zap.Int("size", len(msg.Data)),
+		)
+
 		env, err := decodeEnvelope(msg.Data)
 		if err != nil {
-			s.log.Debug("dropping message", zap.String("reason", "decode"), zap.Error(err))
+			s.log.Warn("dropping message: decode failed", zap.String("topic", topic), zap.Error(err))
 			continue
 		}
 
 		if env.Topic != topic {
-			s.log.Debug("dropping message", zap.String("reason", "topic mismatch"))
+			s.log.Warn("dropping message: topic mismatch", zap.String("expected", topic), zap.String("got", env.Topic))
 			continue
 		}
 
 		if err := verifyEnvelope(msg.ReceivedFrom, env); err != nil {
-			s.log.Debug("dropping message", zap.String("reason", "signature"), zap.Error(err))
+			s.log.Warn("dropping message: signature verification failed", zap.String("topic", topic), zap.Error(err))
 			continue
 		}
 
@@ -225,6 +250,10 @@ func (s *Service) handlePayload(ctx context.Context, topic string, payload []byt
 			s.log.Warn("invalid backend meta", zap.Error(err))
 			return
 		}
+		s.log.Info("received backend meta via gossip",
+			zap.String("backend_id", string(meta.ID)),
+			zap.String("chain_id", string(meta.ChainID)),
+		)
 		if _, err := s.store.ApplyBackendMeta(ctx, meta); err != nil {
 			s.log.Warn("failed to apply backend meta", zap.Error(err))
 		}
@@ -234,6 +263,11 @@ func (s *Service) handlePayload(ctx context.Context, topic string, payload []byt
 			s.log.Warn("invalid backend metrics", zap.Error(err))
 			return
 		}
+		s.log.Info("received backend metrics via gossip",
+			zap.String("backend_id", string(metrics.ID)),
+			zap.Int64("height", metrics.Height),
+			zap.String("health", metrics.Health),
+		)
 		s.store.ApplyBackendMetrics(ctx, metrics)
 	case TopicNodeAdverts:
 		var advert registry.NodeAdvert
@@ -261,6 +295,14 @@ func (s *Service) Publish(ctx context.Context, topic string, payload []byte, clo
 	if !ok {
 		return fmt.Errorf("gossip: topic %s not initialised", topic)
 	}
+
+	peers := s.host.Network().Peers()
+	s.log.Debug("publishing message",
+		zap.String("topic", topic),
+		zap.Uint64("clock", clock),
+		zap.Int("connected_peers", len(peers)),
+	)
+
 	return t.Publish(ctx, encoded)
 }
 
@@ -292,8 +334,16 @@ func (s *Service) PublishNodeAdvert(ctx context.Context, advert registry.NodeAdv
 	if err != nil {
 		return err
 	}
-	if _, err := s.store.ApplyNodeAdvert(ctx, advert); err != nil {
+	changed, err := s.store.ApplyNodeAdvert(ctx, advert)
+	if err != nil {
 		s.log.Warn("failed to apply local node advert", zap.Error(err))
+	} else {
+		s.log.Info("published node advert",
+			zap.String("node_id", string(advert.ID)),
+			zap.Bool("ns_serving", advert.NSServing),
+			zap.Int("ips", len(advert.IPs)),
+			zap.Bool("changed", changed),
+		)
 	}
 	return s.Publish(ctx, TopicNodeAdverts, buf, advert.Clock)
 }
@@ -320,8 +370,10 @@ func (s *Service) Shutdown(ctx context.Context) error {
 
 func (s *Service) connectBootstraps(ctx context.Context, peers []string) error {
 	if len(peers) == 0 {
+		s.log.Info("no bootstrap peers configured")
 		return nil
 	}
+	s.log.Info("connecting to bootstrap peers", zap.Strings("peers", peers))
 	for _, addr := range peers {
 		ma, err := multiaddr.NewMultiaddr(addr)
 		if err != nil {
@@ -335,6 +387,8 @@ func (s *Service) connectBootstraps(ctx context.Context, peers []string) error {
 		}
 		if err := s.host.Connect(ctx, *info); err != nil {
 			s.log.Warn("bootstrap connect failed", zap.String("peer", info.ID.String()), zap.Error(err))
+		} else {
+			s.log.Info("connected to bootstrap peer", zap.String("peer", info.ID.String()))
 		}
 	}
 	return nil
@@ -497,6 +551,12 @@ func (s *Service) handleSyncStream(stream network.Stream) {
 }
 
 func (s *Service) mergeSyncResponse(resp syncResponse) {
+	if len(resp.MetaEntries) > 0 || len(resp.NodeEntries) > 0 {
+		s.log.Info("merging anti-entropy response",
+			zap.Int("meta_entries", len(resp.MetaEntries)),
+			zap.Int("node_entries", len(resp.NodeEntries)),
+		)
+	}
 	if len(resp.MetaEntries) > 0 {
 		s.store.MergeBackendDelta(fromBackendSyncEntries(resp.MetaEntries), resp.MetaVV)
 	}

@@ -1,34 +1,40 @@
 # Backend Agent Configuration
 # Example configuration for meshagent backend node
 
-# LibP2P settings
-identity_key: "CAESQNExample..." # Ed25519 private key in base64
-
-listen_addrs:
-  - "/ip4/0.0.0.0/tcp/4001"
-
-bootstrap_peers:
-  - "/dns4/bootstrap.mesh.example.com/tcp/4001/p2p/12D3KooW..."
+# Mesh/LibP2P settings
+mesh:
+  gossip_key: "CAESQNExample..." # Ed25519 private key in base64 (generate with: meshctl genkeys)
+  listen_addrs:
+    - "/ip4/0.0.0.0/tcp/4001"
+  bootstrap:
+    - "/dns4/bootstrap.mesh.example.com/tcp/4001/p2p/12D3KooW..."
+  data_dir: "/var/lib/mesh"
+  anti_entropy_every: 10s
 
 # Backend settings
-backend_url: "http://localhost:26657"
-backend_type: "tendermint"
-owner_address: "terra1exampleowner..."
+backend:
+  id: "backend-1"
+  chain_id: "phoenix-1"
+  host: "localhost"
+  rpc_endpoint: "http://localhost:26657"
+  lcd_endpoint: "http://localhost:1317"
+  prom_endpoint: "http://localhost:26660"
+  identity_key: "CAESQNExample..." # Same as mesh.gossip_key or separate key
+  owner_key: "terra1exampleowner..."
+  archival: false
+  caps:
+    rpc: true
+    lcd: true
+    ws: true
+  country: "US"
+  region: "us-east"
+  ips:
+    - "203.0.113.20"
+  metadata:
+    provider: "aws"
+    datacenter: "us-east-1"
 
-# Health check
-health_check_interval: 10s
-health_check_timeout: 5s
-health_check_path: "/health"
-
-# Metrics collection
-metrics_interval: 30s
-
-# Node metadata
-country: "US"
-region: "us-east"
-provider: "aws"
-advertise_ips:
-  - "203.0.113.20"
-
-# Logging
-log_level: "info"
+# Probe settings
+probe:
+  interval: 10s
+  timeout: 5s

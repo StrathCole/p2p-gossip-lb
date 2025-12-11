@@ -169,7 +169,7 @@ func parseIdentityKey(b64 string) (crypto.PrivKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode identity key: %w", err)
 	}
-	key, err := crypto.UnmarshalEd25519PrivateKey(raw)
+	key, err := crypto.UnmarshalPrivateKey(raw)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal identity key: %w", err)
 	}

@@ -219,7 +219,12 @@ func (h *Handler) matchServiceName(name string) (registry.ChainID, string, bool)
 	if len(parts) < 2 {
 		return "", "", false
 	}
-	chainPart := parts[len(parts)-2]
+	// Format: <service>.<chain>.<zone>
+	// e.g., rpc.test-chain-1.mesh.test
+	// parts = ["rpc", "test-chain-1"]
+	// parts[0] = service prefix (rpc, lcd, ws)
+	// parts[len(parts)-1] = chain ID (last element before zone)
+	chainPart := parts[len(parts)-1]
 	chain := registry.ChainID(chainPart)
 	for _, c := range h.cfg.Chains {
 		if c == chain {
